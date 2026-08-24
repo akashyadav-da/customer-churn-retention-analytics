@@ -79,6 +79,8 @@ The e-commerce company is experiencing customer churn and wants to understand wh
 │
 ├── README.md
 └── .gitignore
+
+```
 ---
 
 ## Methodology
