@@ -115,6 +115,63 @@ Business Insights & Recommendations
 
 ## SQL Analysis
 
+SQL was used to answer 10 business questions related to customer churn, retention, customer behavior, and risk segmentation.
+
+The analysis covers:
+
+1. Overall churn and retention rates
+2. Churn across demographic segments
+3. Customer tenure and churn
+4. Satisfaction and complaint behavior
+5. Impact of customer complaints on churn
+6. Purchase recency and app engagement
+7. Churn by preferred product category
+8. Purchase frequency and retention
+9. Combined customer risk segmentation
+10. High-risk customer exposure and retention opportunity
+
+The complete SQL queries used to answer these questions are available in:
+
+📂 [`sql/retention_root_cause_analysis.sql`](sql/retention_root_cause_analysis.sql)
+
+### Example Business Question
+
+**Which combination of factors identifies the highest-risk customers?**
+
+```sql
+WITH risk_analysis AS (
+    SELECT
+        CustomerID,
+        Churn,
+
+        CASE
+            WHEN Tenure <= 6 THEN 1
+            ELSE 0
+        END +
+
+        CASE
+            WHEN Complain = 1 THEN 1
+            ELSE 0
+        END +
+
+        CASE
+            WHEN PreferedOrderCat = 'Mobile Phone' THEN 1
+            ELSE 0
+        END AS risk_score
+
+    FROM customerS
+)
+
+SELECT
+    risk_score,
+    COUNT(*) AS total_customers,
+    SUM(Churn) AS churned,
+    ROUND(AVG(Churn) * 100, 2) AS churn_rate_pct
+FROM risk_analysis
+GROUP BY risk_score
+ORDER BY risk_score;
+```
+
 ---
 
 ## Key Findings
@@ -136,11 +193,13 @@ Business Insights & Recommendations
 
 ## Dashboard Preview
 
-*(screenshot goes here — [add your exported PNG to `/images/dashboard_preview.png`])*
+### Page 1 — Overview & Drivers
 
-Two-page Power BI report:
-- **Page 1 — Overview:** churn rate by tenure, complaint, product category, and recency
-- **Page 2 — Risk Analysis:** the combined risk score, a tenure × recency risk matrix, and the sized retention opportunity
+![Dashboard Page 1](images/dashboard_page1.png)
+
+### Page 2 — Risk & Retention Analysis
+
+![Dashboard Page 2](images/dashboard_page2.png)
 
 ---
 
