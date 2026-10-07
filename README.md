@@ -20,6 +20,8 @@ The e-commerce company is experiencing customer churn and wants to understand wh
 8. Does purchase frequency affect retention?
 9. Which combination of risk factors identifies the highest-risk customers?
 10. How many valuable customers are at risk, and what's the retention opportunity (₹)?
+11. Can machine learning identify customers who are most likely to churn?
+12. How can predicted churn risk be translated into actionable retention segments?
 
 
 
@@ -34,12 +36,26 @@ The e-commerce company is experiencing customer churn and wants to understand wh
 
 ## Project Highlights
 
+### Descriptive & Diagnostic Analysis
+
 - **5,630 customers** analyzed
 - **16.8% overall churn rate**
 - **32.4% → 0% churn** from early-tenure to 2+ year customers
 - **68.2% churn rate** among customers with all 3 identified risk factors
-- **1,672 customers** identified as high-risk, representing **₹247,735** in cashback exposure
+- **1,672 customers** identified with 2+ rule-based risk flags, representing **₹247,735** in cashback exposure
 
+### Predictive Analytics
+
+- Compared **Logistic Regression, Decision Tree, and Random Forest**
+- Random Forest achieved the strongest overall cross-validation performance among the tested models with **ROC-AUC ≈ 0.980**
+- Selected a **0.30 churn-probability threshold using out-of-fold predictions** to prioritize recall
+- On the untouched test set, the final model identified **187 of 190 actual churners**
+- Final test-set churn recall: **98%**
+- Final test-set churn F1-score: **93%**
+- Final test-set ROC-AUC: **≈ 0.999**
+- **166 customers** were classified as High Risk and **43** as Medium Risk in the held-out test set
+
+> These ML results are evaluation results for this dataset, not guarantees of production performance.
 
 ## Tools Used
 
@@ -64,7 +80,8 @@ The e-commerce company is experiencing customer churn and wants to understand wh
 │   └── processed/                            # Cleaned + feature-engineered dataset
 │
 ├── notebooks/
-│   └── churn_eda.ipynb                 # Data cleaning, EDA & feature engineering
+│   ├── churn_eda.ipynb                       # Data cleaning, EDA & feature engineering
+│   └── ml_modeling.ipynb                     # Churn prediction and customer risk modeling
 │
 ├── sql/
 │   ├── db_creation.sql                       # Database/table creation and data loading
@@ -99,6 +116,12 @@ SQL Business Analysis
 Power BI Dashboard
    ↓
 Business Insights & Recommendations
+   ↓
+Machine Learning Churn Prediction
+   ↓
+Customer Risk Segmentation
+   ↓
+Retention Prioritization
 
 ```
 
@@ -174,6 +197,91 @@ ORDER BY risk_score;
 
 ---
 
+## Machine Learning: Churn Prediction
+
+The project was extended from explaining historical churn to predicting which customers are most likely to churn.
+
+### Modeling Approach
+
+The target is binary:
+
+- `0` = retained
+- `1` = churned
+
+```text
+Feature Preparation
+      ↓
+Stratified Train/Test Split
+      ↓
+Preprocessing Pipeline
+      ↓
+Logistic Regression
+      ↓
+Decision Tree
+      ↓
+Random Forest
+      ↓
+Cross-Validation
+      ↓
+Hyperparameter Check
+      ↓
+Threshold Selection
+      ↓
+Final Test Evaluation
+      ↓
+Customer-Level Churn Probability
+      ↓
+Risk Segmentation
+```
+
+`CustomerID` was excluded because it is an identifier. The manually constructed `Risk_Score` and bucketed versions of variables were also excluded from the ML feature set.
+
+### Model Comparison
+
+Five-fold stratified cross-validation was used to compare the candidate models.
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
+|---|---:|---:|---:|---:|---:|
+| Random Forest | 0.946 | 0.943 | 0.722 | 0.817 | **0.980** |
+| Logistic Regression | 0.895 | 0.765 | 0.540 | 0.632 | 0.896 |
+| Decision Tree | 0.925 | 0.780 | 0.771 | 0.775 | 0.863 |
+
+Random Forest was retained as the strongest overall candidate among the tested models based on cross-validation. The choice is not treated as universally optimal; the business cost of false positives versus missed churners also matters.
+
+### Threshold Selection
+
+The final threshold was selected from **out-of-fold training predictions**, rather than directly optimizing on the test set.
+
+A **0.30 threshold** was selected because it produced the highest F1-score among the tested thresholds while maintaining high recall.
+
+On the untouched test set:
+
+- **187 / 190 actual churners identified**
+- **98% recall** for churn
+- **88% precision** for churn
+- **93% F1-score** for churn
+- **≈0.999 ROC-AUC**
+- **25 false positives**
+- **3 missed churners**
+
+The threshold reflects a business preference toward **catching more potential churners**, accepting some additional false positives.
+
+### Customer Risk Segmentation
+
+| Risk Level | Test Customers | Observed Churn Rate |
+|---|---:|---:|
+| Low (<30%) | 917 | 0.33% |
+| Medium (30–50%) | 43 | 51.16% |
+| High (≥50%) | 166 | 99.40% |
+
+These are **observed rates within the held-out test set**, not guarantees for future customers.
+
+The High-risk group was further profiled by customer characteristics. Laptop & Accessory and Mobile Phone customers together represented approximately 70% of the High-risk group. About 32.5% had a recorded complaint, and approximately 64% had satisfaction scores of 2 or 3.
+
+These patterns support customer profiling and prioritization, **not causal conclusions**.
+
+---
+
 ## Key Findings
 
 1. **Tenure is the dominant churn driver.** Churn drops from **32.4%** (0–6 months) to **0%** (2+ years) in a near-perfect staircase.
@@ -181,13 +289,19 @@ ORDER BY risk_score;
 3. **Recency is confounded by tenure.** Customers with the most recent orders show the *highest* churn — likely because a customer's final order naturally looks "recent" in a snapshot dataset, not because recent activity is protective.
 4. **Category matters:** Mobile Phone buyers churn at **27.4%**, over 5x the rate of Grocery buyers (**4.9%**).
 5. **Combining the three strongest drivers (Tenure, Complain, Category) into a Risk Score produces a dramatic gradient** — 3.8% churn at 0 flags, climbing to **68.2%** at 3 flags.
-6. **1,672 customers (29.7% of the base)** carry 2+ risk flags, representing **₹247,735** in cashback exposure, used as a proxy for customer value
+6. **1,672 customers (29.7% of the base)** carry 2+ risk flags, representing **₹247,735** in cashback exposure, used as a proxy for customer value.
+
+7. **The ML model adds an individual-level prediction layer.** Instead of relying only on the manually defined Risk Score, the Random Forest estimates churn probability and groups customers into Low, Medium, and High predicted-risk segments.
 
 ## Recommendations
 
 1. **Prioritize the 362 "critical risk" customers first** (all 3 flags, 68.2% churn rate, ₹51,222 exposure) — highest urgency, smallest, most targeted group.
 2. **Build an early-lifecycle retention program for the first 6 months** — this is where churn risk is structurally highest regardless of any other factor.
 3. **Prioritize complaint resolution alongside satisfaction monitoring** — complaint status was a stronger churn signal in this dataset, suggesting that response speed and resolution quality may deserve greater operational attention.
+
+4. **Use predicted risk to allocate retention resources.** Prioritize High-risk customers first, followed by Medium-risk customers. Consider customer value and the likely cost of intervention rather than treating every at-risk customer equally.
+
+5. **Measure whether retention actions actually work.** The model identifies who is at risk; it does not prove which intervention will prevent churn. Retention campaigns should be evaluated through follow-up analysis or controlled experiments.
 
 ---
 
@@ -201,6 +315,7 @@ ORDER BY risk_score;
 
 ![Dashboard Page 2](images/dashboard_page2.png)
 
+
 ---
 
 ## Assumptions & Limitations
@@ -210,6 +325,9 @@ ORDER BY risk_score;
 - `CashbackAmount` is used as a proxy for customer value in the absence of a direct revenue/lifetime-value column.
 - Two `WarehouseToHome` values were treated as likely data entry errors and capped — this judgment call is documented in the cleaning notebook.
 - The dataset does not contain timestamps or a defined observation period, so churn trends over time and seasonality cannot be analyzed.
+- ML results are based on this dataset's available features and a held-out test set. Before production use, feature timing relative to the churn definition should be validated to rule out temporal leakage.
+- Model feature importance indicates **predictive usefulness, not causal impact**.
+- The very strong separation observed in the ML test-set risk groups should not be assumed to generalize to future customers without additional validation.
 
 
 ---
